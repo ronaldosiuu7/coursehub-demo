@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import logging
-from multiprocessing.dummy import connection
-from unittest import result
 
 from fastapi import FastAPI, HTTPException, Query, Response, status
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from .database import engine
-from .schemas import EnrollmentCreate
+from .schemas import EnrollmentCreate, SectionCapacityUpdate
 
 logger = logging.getLogger(__name__)
 app = FastAPI(
@@ -38,9 +36,25 @@ def health_check() -> dict[str, str]:
     return {"status": "ok", "database": "connected"}
 
 
+@app.get("/lecturers")
+def list_lecturers() -> list[dict[str, object]]:
+    sql = """
+        SELECT id, name
+        FROM lecturers
+        ORDER BY id
+    """
+
+    with engine.connect() as connection:
+        rows = connection.execute(text(sql)).mappings().all()
+
+    return [dict(row) for row in rows]
+
+
 @app.get("/courses")
 def list_courses(
     q: str | None = Query(default=None, min_length=1),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=10, ge=1, le=100),
 ) -> list[dict[str, object]]:
     sql = """
         SELECT code, name, credits
@@ -61,7 +75,9 @@ def list_courses(
         """
         parameters["keyword"] = f"%{keyword}%"
 
-    sql += " ORDER BY code"
+    sql += " ORDER BY code OFFSET :skip LIMIT :limit"
+    parameters["skip"] = skip
+    parameters["limit"] = limit
 
     with engine.connect() as connection:
         rows = connection.execute(text(sql), parameters).mappings().all()
@@ -90,6 +106,7 @@ def get_course(course_code: str) -> dict[str, object]:
 
     return dict(row)
 
+
 @app.get("/sections")
 def list_sections(
     available_only: bool = False,
@@ -105,6 +122,93 @@ def list_sections(
     with engine.connect() as connection:
         rows = connection.execute(text(sql)).mappings().all()
     return [dict(row) for row in rows]
+
+
+@app.get("/sections/{section_id}")
+def get_section(section_id: str) -> dict[str, object]:
+    sql = """
+        SELECT cs.id AS class_id,
+               c.code AS course_code,
+               c.name AS course_name,
+               sem.code AS semester_code,
+               sem.name AS semester_name,
+               lec.id AS lecturer_id,
+               lec.name AS lecturer_name,
+               cs.capacity,
+               summary.enrolled,
+               summary.remaining
+        FROM class_sections AS cs
+        JOIN courses AS c ON c.code = cs.course_code
+        JOIN semesters AS sem ON sem.code = cs.semester_code
+        JOIN lecturers AS lec ON lec.id = cs.lecturer_id
+        JOIN v_section_summary AS summary ON summary.class_id = cs.id
+        WHERE cs.id = :section_id
+    """
+
+    with engine.connect() as connection:
+        row = connection.execute(
+            text(sql),
+            {"section_id": section_id.upper()},
+        ).mappings().first()
+
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Khong tim thay lop hoc phan",
+        )
+
+    return dict(row)
+
+
+@app.patch("/sections/{section_id}/capacity")
+def update_section_capacity(
+    section_id: str,
+    payload: SectionCapacityUpdate,
+) -> dict[str, object]:
+    section_sql = """
+        SELECT cs.id,
+               COUNT(e.student_id) AS enrolled
+        FROM class_sections AS cs
+        LEFT JOIN enrollments AS e ON e.class_section_id = cs.id
+        WHERE cs.id = :section_id
+        GROUP BY cs.id
+    """
+    update_sql = """
+        UPDATE class_sections
+        SET capacity = :capacity
+        WHERE id = :section_id
+    """
+    parameters = {
+        "section_id": section_id.upper(),
+        "capacity": payload.capacity,
+    }
+
+    with engine.begin() as connection:
+        section = connection.execute(
+            text(section_sql),
+            {"section_id": parameters["section_id"]},
+        ).mappings().first()
+
+        if section is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Khong tim thay lop hoc phan",
+            )
+
+        if payload.capacity < int(section["enrolled"]):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Suc chua khong duoc nho hon so sinh vien da dang ky",
+            )
+
+        connection.execute(text(update_sql), parameters)
+
+    return {
+        "message": "Cap nhat suc chua thanh cong",
+        "class_section_id": str(parameters["section_id"]),
+        "capacity": payload.capacity,
+        "remaining": payload.capacity - int(section["enrolled"]),
+    }
 
 
 @app.get("/students/{student_id}/enrollments")
