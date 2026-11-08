@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 import logging
 
 from fastapi import FastAPI, HTTPException, Query, Response, status
@@ -412,3 +414,43 @@ def delete_enrollment(student_id: str, class_section_id: str) -> Response:
         connection.execute(text(event_sql), parameters)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.get("/enrollment-events")
+def get_enrollment_events(
+    student_id: str | None = None,
+    event_type: Literal["CREATED", "CANCELLED"] | None = None,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=10, ge=1, le=100),
+) -> list[dict[str, object]]:
+    sql = """
+        SELECT id, student_id, class_section_id,
+               event_type, source, dataset, occurred_at
+        FROM enrollment_events
+        WHERE 1 = 1
+    """
+
+    parameters: dict[str, object] = {
+        "skip": skip,
+        "limit": limit,
+    }
+
+    if student_id is not None:
+        sql += " AND student_id = :student_id"
+        parameters["student_id"] = student_id
+
+    if event_type is not None:
+        sql += " AND event_type = :event_type"
+        parameters["event_type"] = event_type
+
+    sql += """
+        ORDER BY occurred_at DESC, id DESC
+        LIMIT :limit OFFSET :skip
+    """
+
+    with engine.connect() as connection:
+        rows = connection.execute(
+            text(sql), parameters
+        ).mappings().all()
+
+    return [dict(row) for row in rows]
