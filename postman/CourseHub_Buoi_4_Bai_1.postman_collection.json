@@ -1,0 +1,180 @@
+{
+  "info": {
+    "name": "CourseHub - Buoi 4 - Bai 1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Read-only tests. Set student_id and event_type to an existing enrollment_events row before running."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "student_id",
+      "value": "22000001"
+    },
+    {
+      "key": "event_type",
+      "value": "CREATED"
+    }
+  ],
+  "item": [
+    {
+      "name": "Co du lieu",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/enrollment-events?student_id={{student_id}}&event_type={{event_type}}&skip=0&limit=10"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test(\"Response data\", () => { pm.expect(body).to.be.an(\"array\"); pm.expect(body.length).to.be.above(0);",
+              "body.forEach(row => { pm.expect(row.student_id).to.eql(pm.variables.get(\"student_id\")); pm.expect(row.event_type).to.eql(pm.variables.get(\"event_type\")); }); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Khong co du lieu",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/enrollment-events?student_id=__no_student__&skip=0&limit=10"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test(\"Response data\", () => { pm.expect(body).to.be.an(\"array\"); pm.expect(body).to.eql([]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Trang 1",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/enrollment-events?skip=0&limit=2"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test(\"Response data\", () => { pm.expect(body).to.be.an(\"array\"); pm.expect(body.length).to.be.at.most(2); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Trang 2",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/enrollment-events?skip=2&limit=2"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test(\"Response data\", () => { pm.expect(body).to.be.an(\"array\"); pm.expect(body.length).to.be.at.most(2); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Limit bang 0",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/enrollment-events?limit=0"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+              "const body = pm.response.json();"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Limit vuot 100",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/enrollment-events?limit=101"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+              "const body = pm.response.json();"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Skip am",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/enrollment-events?skip=-1"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+              "const body = pm.response.json();"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Loai su kien sai",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/enrollment-events?event_type=INVALID"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+              "const body = pm.response.json();"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
