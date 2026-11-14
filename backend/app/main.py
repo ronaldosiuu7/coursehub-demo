@@ -430,6 +430,7 @@ def delete_enrollment(student_id: str, class_section_id: str) -> Response:
 def get_enrollment_events(
     student_id: str | None = None,
     event_type: Literal["CREATED", "CANCELLED"] | None = None,
+    dataset: Literal["demo", "perf"] | None = None,
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=100),
 ) -> list[dict[str, object]]:
@@ -452,6 +453,10 @@ def get_enrollment_events(
     if event_type is not None:
         sql += " AND event_type = :event_type"
         parameters["event_type"] = event_type
+
+    if dataset is not None:
+        sql += " AND dataset = :dataset"
+        parameters["dataset"] = dataset
 
     sql += """
         ORDER BY occurred_at DESC, id DESC

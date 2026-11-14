@@ -60,6 +60,13 @@ small { color: #718094; font-size: 11px; }
 .enrollments { padding: 0; list-style: none; margin: 0; }
 .enrollments li { padding: 14px 0; border-bottom: 1px solid #e2e8f0; }
 .enrollments button { margin-top: 9px; }
+.workspace { margin-bottom: 18px; }
+.history-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.history-header h2 { margin-bottom: 4px; }
+.pagination { display: flex; gap: 8px; }
 footer { color: #63738a; font-size: 12px; padding: 3px 4px 18px; }
 @media (max-width: 900px) {
   .workspace { grid-template-columns: 1fr; }
