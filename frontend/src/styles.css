@@ -24,11 +24,11 @@ p { margin: 10px 0; }
 .student-form { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .student-form input { width: 170px; }
 label { font-weight: 600; }
-input:not([type="checkbox"]) {
+input:not([type="checkbox"]), select {
   border: 1px solid #9dacbd; border-radius: 7px; padding: 9px 11px;
-  font: inherit; min-width: 0;
+  font: inherit; min-width: 0; background: #fff;
 }
-input:focus, button:focus-visible { outline: 3px solid #83b6e8; outline-offset: 2px; }
+input:focus, select:focus, button:focus-visible { outline: 3px solid #83b6e8; outline-offset: 2px; }
 button {
   border: 1px solid #20588a; background: #20588a; color: #fff;
   border-radius: 7px; padding: 9px 12px; font: inherit;
