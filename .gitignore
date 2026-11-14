@@ -2,4 +2,7 @@
 backend/.env
 __pycache__/
 *.py[cod]
-
+.env
+.env.local
+node_modules/
+dist/
