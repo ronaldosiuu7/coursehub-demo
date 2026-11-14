@@ -3,6 +3,7 @@ import { api } from "./api.js";
 import Notice from "./components/Notice.jsx";
 import SectionTable from "./components/SectionTable.jsx";
 import EnrollmentList from "./components/EnrollmentList.jsx";
+import StudentForm from "./components/StudentForm.jsx";
 
 export default function App() {
   const [draftId, setDraftId] = useState("22000004");
@@ -117,20 +118,15 @@ export default function App() {
       <p className="demo-note">
         Môi trường thực hành. Nhập mã sinh viên để thử dữ liệu, không phải đăng nhập.
       </p>
-      <section className="panel">
-        <h2>1. Chọn sinh viên</h2>
-        <form className="student-form" onSubmit={chooseStudent}>
-          <label htmlFor="student-id">Mã sinh viên</label>
-          <input id="student-id" value={draftId} maxLength={8} required
-            inputMode="numeric" onChange={(e) => setDraftId(e.target.value)}
-            disabled={busy} />
-          <button type="submit" disabled={busy}>Xem đăng ký</button>
-          <button type="button" className="secondary" disabled={busy || loading}
-            onClick={() => setRefresh((value) => value + 1)}>Tải lại dữ liệu</button>
-        </form>
-        <p className="muted">Dữ liệu đang xem: <strong>{studentId}</strong>.
-          Mã mẫu: 22000001–22000004.</p>
-      </section>
+      <StudentForm
+        draftId={draftId}
+        studentId={studentId}
+        busy={busy}
+        loading={loading}
+        onDraftChange={setDraftId}
+        onSubmit={chooseStudent}
+        onReload={() => setRefresh((value) => value + 1)}
+      />
       <Notice kind={notice.kind}>{notice.text}</Notice>
       <Notice kind="error">{error}</Notice>
       {loading && <Notice>Đang tải dữ liệu từ API...</Notice>}
