@@ -6,6 +6,7 @@ import EnrollmentList from "./components/EnrollmentList.jsx";
 import StudentForm from "./components/StudentForm.jsx";
 import EnrollmentHistory from "./components/EnrollmentHistory.jsx";
 
+const SECTION_PAGE_SIZE = 3;
 const HISTORY_PAGE_SIZE = 5;
 
 export default function App() {
@@ -22,6 +23,10 @@ export default function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState({ kind: "info", text: "" });
   const [refresh, setRefresh] = useState(0);
+  const [sectionPage, setSectionPage] = useState(0);
+  const [sectionHasNext, setSectionHasNext] = useState(false);
+  const [sectionsLoading, setSectionsLoading] = useState(true);
+  const [sectionsError, setSectionsError] = useState("");
   const [history, setHistory] = useState([]);
   const [historyPage, setHistoryPage] = useState(0);
   const [historyHasNext, setHistoryHasNext] = useState(false);
@@ -35,20 +40,17 @@ export default function App() {
       setLoading(true);
       setError("");
       try {
-        const [courseData, sectionData, enrollmentData] = await Promise.all([
+        const [courseData, enrollmentData] = await Promise.all([
           api("/courses", options),
-          api("/sections", options),
           api(`/students/${encodeURIComponent(studentId)}/enrollments`, options),
         ]);
         if (controller.signal.aborted) return;
         setCourses(courseData);
-        setSections(sectionData);
         setEnrollments(enrollmentData);
       } catch (err) {
         if (controller.signal.aborted) return;
         setError(err.message);
         setCourses([]);
-        setSections([]);
         setEnrollments([]);
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -57,6 +59,39 @@ export default function App() {
     loadData();
     return () => controller.abort();
   }, [studentId, refresh]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadSections() {
+      setSectionsLoading(true);
+      setSectionsError("");
+      try {
+        const params = new URLSearchParams({
+          available_only: String(onlyAvailable),
+          skip: String(sectionPage * SECTION_PAGE_SIZE),
+          limit: String(SECTION_PAGE_SIZE + 1),
+        });
+        if (search.trim()) params.set("q", search.trim());
+        if (selectedCourse) params.set("course_code", selectedCourse);
+
+        const data = await api(`/sections?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+        setSectionHasNext(data.length > SECTION_PAGE_SIZE);
+        setSections(data.slice(0, SECTION_PAGE_SIZE));
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setSectionsError(err.message);
+        setSections([]);
+        setSectionHasNext(false);
+      } finally {
+        if (!controller.signal.aborted) setSectionsLoading(false);
+      }
+    }
+    loadSections();
+    return () => controller.abort();
+  }, [search, selectedCourse, onlyAvailable, sectionPage, refresh]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -135,18 +170,13 @@ export default function App() {
     }
   }
 
-  const keyword = search.trim().toLowerCase();
   const rows = sections.map((section) => ({
     ...section,
     course_name: courses.find((course) => course.code === section.course_code)?.name
       ?? section.course_code,
     registered: enrollments.some((item) => item.class_section_id === section.class_id),
-  })).filter((row) => (
-    `${row.class_id} ${row.course_code} ${row.course_name}`.toLowerCase().includes(keyword)
-    && (!selectedCourse || row.course_code === selectedCourse)
-    && (!onlyAvailable || row.remaining > 0)
-  ));
-  const disabled = loading || busy || Boolean(error);
+  }));
+  const disabled = loading || sectionsLoading || busy || Boolean(error) || Boolean(sectionsError);
 
   return (
     <main className="container">
@@ -178,11 +208,17 @@ export default function App() {
             <div className="filters">
               <label htmlFor="search">Tìm lớp / học phần</label>
               <input id="search" value={search} placeholder="Ví dụ: web"
-                onChange={(e) => setSearch(e.target.value)} />
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setSectionPage(0);
+                }} />
               <select
                 aria-label="Lọc theo học phần"
                 value={selectedCourse}
-                onChange={(e) => setSelectedCourse(e.target.value)}
+                onChange={(e) => {
+                  setSelectedCourse(e.target.value);
+                  setSectionPage(0);
+                }}
               >
                 <option value="">Tất cả học phần</option>
                 {courses.map((course) => (
@@ -193,12 +229,43 @@ export default function App() {
               </select>
               <label className="check">
                 <input type="checkbox" checked={onlyAvailable}
-                  onChange={(e) => setOnlyAvailable(e.target.checked)} />
+                  onChange={(e) => {
+                    setOnlyAvailable(e.target.checked);
+                    setSectionPage(0);
+                  }} />
                 Chỉ hiện lớp còn chỗ
               </label>
             </div>
-            <SectionTable rows={rows} disabled={disabled}
-              onEnroll={(id) => changeEnrollment(id)} />
+            <Notice kind="error">{sectionsError}</Notice>
+            {sectionsLoading
+              ? <Notice>Đang tải danh sách lớp...</Notice>
+              : !sectionsError && (
+                <>
+                  <SectionTable rows={rows} disabled={disabled}
+                    onEnroll={(id) => changeEnrollment(id)} />
+                  <div className="history-header" style={{ marginTop: "14px", marginBottom: 0 }}>
+                    <span className="muted">Trang {sectionPage + 1}</span>
+                    <div className="pagination">
+                      <button
+                        type="button"
+                        className="secondary"
+                        disabled={sectionsLoading || sectionPage === 0}
+                        onClick={() => setSectionPage((p) => Math.max(0, p - 1))}
+                      >
+                        Trang trước
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary"
+                        disabled={sectionsLoading || !sectionHasNext}
+                        onClick={() => setSectionPage((p) => p + 1)}
+                      >
+                        Trang sau
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
           </section>
           <section className="panel">
             <h2>3. Lớp đã đăng ký</h2>

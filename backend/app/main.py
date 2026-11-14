@@ -122,17 +122,42 @@ def get_course(course_code: str) -> dict[str, object]:
 @app.get("/sections")
 def list_sections(
     available_only: bool = False,
+    q: str | None = Query(default=None),
+    course_code: str | None = Query(default=None),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
 ) -> list[dict[str, object]]:
     sql = """
-        SELECT class_id, course_code, capacity, enrolled, remaining
-        FROM v_section_summary
+        SELECT v.class_id, v.course_code, v.capacity, v.enrolled, v.remaining
+        FROM v_section_summary v
+        JOIN courses c ON c.code = v.course_code
+        WHERE 1 = 1
     """
-    if available_only:
-        sql += " WHERE remaining > 0"
+    parameters: dict[str, object] = {
+        "skip": skip,
+        "limit": limit,
+    }
 
-    sql += " ORDER BY class_id"
+    if available_only:
+        sql += " AND v.remaining > 0"
+
+    if course_code is not None and course_code.strip():
+        sql += " AND v.course_code = :course_code"
+        parameters["course_code"] = course_code.strip()
+
+    if q is not None and q.strip():
+        sql += """
+            AND (
+                LOWER(v.class_id) LIKE :keyword
+                OR LOWER(v.course_code) LIKE :keyword
+                OR LOWER(c.name) LIKE :keyword
+            )
+        """
+        parameters["keyword"] = f"%{q.strip().lower()}%"
+
+    sql += " ORDER BY v.class_id ASC LIMIT :limit OFFSET :skip"
     with engine.connect() as connection:
-        rows = connection.execute(text(sql)).mappings().all()
+        rows = connection.execute(text(sql), parameters).mappings().all()
     return [dict(row) for row in rows]
 
 
