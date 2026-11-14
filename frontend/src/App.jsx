@@ -12,6 +12,7 @@ export default function App() {
   const [sections, setSections] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
   const [search, setSearch] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState("");
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -103,6 +104,7 @@ export default function App() {
     registered: enrollments.some((item) => item.class_section_id === section.class_id),
   })).filter((row) => (
     `${row.class_id} ${row.course_code} ${row.course_name}`.toLowerCase().includes(keyword)
+    && (!selectedCourse || row.course_code === selectedCourse)
     && (!onlyAvailable || row.remaining > 0)
   ));
   const disabled = loading || busy || Boolean(error);
@@ -138,6 +140,18 @@ export default function App() {
               <label htmlFor="search">Tìm lớp / học phần</label>
               <input id="search" value={search} placeholder="Ví dụ: web"
                 onChange={(e) => setSearch(e.target.value)} />
+              <select
+                aria-label="Lọc theo học phần"
+                value={selectedCourse}
+                onChange={(e) => setSelectedCourse(e.target.value)}
+              >
+                <option value="">Tất cả học phần</option>
+                {courses.map((course) => (
+                  <option key={course.code} value={course.code}>
+                    {course.code} — {course.name}
+                  </option>
+                ))}
+              </select>
               <label className="check">
                 <input type="checkbox" checked={onlyAvailable}
                   onChange={(e) => setOnlyAvailable(e.target.checked)} />
