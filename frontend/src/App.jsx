@@ -4,6 +4,9 @@ import Notice from "./components/Notice.jsx";
 import SectionTable from "./components/SectionTable.jsx";
 import EnrollmentList from "./components/EnrollmentList.jsx";
 import StudentForm from "./components/StudentForm.jsx";
+import EnrollmentHistory from "./components/EnrollmentHistory.jsx";
+
+const HISTORY_PAGE_SIZE = 5;
 
 export default function App() {
   const [draftId, setDraftId] = useState("22000004");
@@ -19,6 +22,11 @@ export default function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState({ kind: "info", text: "" });
   const [refresh, setRefresh] = useState(0);
+  const [history, setHistory] = useState([]);
+  const [historyPage, setHistoryPage] = useState(0);
+  const [historyHasNext, setHistoryHasNext] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -50,6 +58,35 @@ export default function App() {
     return () => controller.abort();
   }, [studentId, refresh]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadHistory() {
+      setHistoryLoading(true);
+      setHistoryError("");
+      try {
+        const skip = historyPage * HISTORY_PAGE_SIZE;
+        const limit = HISTORY_PAGE_SIZE + 1;
+        const data = await api(
+          `/enrollment-events?student_id=${encodeURIComponent(studentId)}` +
+          `&dataset=demo&skip=${skip}&limit=${limit}`,
+          { signal: controller.signal },
+        );
+        if (controller.signal.aborted) return;
+        setHistoryHasNext(data.length > HISTORY_PAGE_SIZE);
+        setHistory(data.slice(0, HISTORY_PAGE_SIZE));
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setHistoryError(err.message);
+        setHistory([]);
+        setHistoryHasNext(false);
+      } finally {
+        if (!controller.signal.aborted) setHistoryLoading(false);
+      }
+    }
+    loadHistory();
+    return () => controller.abort();
+  }, [studentId, historyPage, refresh]);
+
   function chooseStudent(event) {
     event.preventDefault();
     const nextId = draftId.trim();
@@ -59,6 +96,7 @@ export default function App() {
     }
     setNotice({ kind: "info", text: "" });
     setLoading(true);
+    setHistoryPage(0);
     setStudentId(nextId);
     setRefresh((value) => value + 1);
   }
@@ -91,6 +129,7 @@ export default function App() {
     } finally {
       // Đọc lại CSDL kể cả sau lỗi; không tự cộng/trừ số chỗ ở giao diện.
       setLoading(true);
+      setHistoryPage(0);
       setRefresh((value) => value + 1);
       setBusy(false);
     }
@@ -168,6 +207,18 @@ export default function App() {
               onCancel={(id) => changeEnrollment(id, true)} />
           </section>
         </div>
+      )}
+      {!loading && !error && (
+        <EnrollmentHistory
+          studentId={studentId}
+          rows={history}
+          page={historyPage}
+          hasNext={historyHasNext}
+          loading={historyLoading}
+          error={historyError}
+          onPrevPage={() => setHistoryPage((p) => Math.max(0, p - 1))}
+          onNextPage={() => setHistoryPage((p) => p + 1)}
+        />
       )}
       <footer>Số chỗ và đăng ký được đọc từ API; Backend quyết định tính hợp lệ.</footer>
     </main>
