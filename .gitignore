@@ -4,5 +4,7 @@ __pycache__/
 *.py[cod]
 .env
 .env.local
+.env.docker
 node_modules/
 dist/
+.pytest_cache/
